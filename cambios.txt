@@ -1,1 +1,6 @@
-test
+Hola ! aqui los cambios que hemos hecho (v2.5)
+1. se ha corregido un bug en el cual al hablar con un npc se crasheaba le juego
+2. se ha integrado un nuevo npc en el cual si le hablas te redirije a la batalla de toy chica
+3. Nuevo desafuio!!! si le ganas a chica en cierto tiempo si vuelves a hablar con el npc puedes obtemner cosas dependiendo del rango
+. esos son todos los cambios
+si hay otro bug no dudes en avisar
