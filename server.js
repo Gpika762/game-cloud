@@ -13,7 +13,7 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-// Inicializar la base de datos
+// Inicializar la base de datos con soporte para el Updater y el Juego
 const initDB = async () => {
   try {
     await pool.query(`
@@ -24,26 +24,40 @@ const initDB = async () => {
       );
     `);
     
+    // Verificar si ya está la estructura base
     const res = await pool.query("SELECT * FROM configuracion WHERE clave = 'version'");
     if (res.rowCount === 0) {
+      // Configuración Original del Juego
       await pool.query("INSERT INTO configuracion (clave, valor) VALUES ('version', '2.3')");
       await pool.query("INSERT INTO configuracion (clave, valor) VALUES ('url_data_win', 'https://tu-enlace-aqui.com/data.win')");
       await pool.query("INSERT INTO configuracion (clave, valor) VALUES ('url_exe', 'https://tu-enlace-aqui.com/SteelAndPowder.exe')");
     }
+
+    // NUEVO: Asegurar que existan las claves para el Auto-Updater (si no existen se crean)
+    await pool.query(`
+      INSERT INTO configuracion (clave, valor) 
+      VALUES ('url_updater_version', '3.5') 
+      ON CONFLICT (clave) DO NOTHING;
+    `);
+    await pool.query(`
+      INSERT INTO configuracion (clave, valor) 
+      VALUES ('url_updater_exe', 'https://tu-enlace-aqui.com/SteelAndPowderUpdater.exe') 
+      ON CONFLICT (clave) DO NOTHING;
+    `);
+
   } catch (err) {
-    console.error("Error al inicializar DB:", err);
+    console.error("Error al inicializar la base de datos estratégica:", err);
   }
 };
 initDB();
 
-// --- INTERFAZ GRÁFICA BONITA (Dashboard) ---
+// --- INTERFAZ GRÁFICA CONTROL DE MANDOS (Dashboard) ---
 app.get('/', async (req, res) => {
   try {
     const datos = await pool.query("SELECT * FROM configuracion");
     const config = {};
     datos.rows.forEach(row => { config[row.clave] = row.valor; });
 
-    // HTML y CSS incrustado con diseño premium oscuro
     res.send(`
       <!DOCTYPE html>
       <html lang="es">
@@ -56,6 +70,7 @@ app.get('/', async (req, res) => {
             --bg-color: #0b0f19;
             --panel-color: #151d30;
             --accent-color: #00f2fe;
+            --accent-updater: #ff3c46; /* Color Rojo de Identidad para la sección del Updater */
             --text-color: #f1f5f9;
             --text-muted: #64748b;
             --success-color: #10b981;
@@ -65,7 +80,7 @@ app.get('/', async (req, res) => {
             background-color: var(--bg-color);
             color: var(--text-color);
             margin: 0;
-            padding: 20px;
+            padding: 40px 20px;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -74,7 +89,7 @@ app.get('/', async (req, res) => {
           .dashboard {
             background-color: var(--panel-color);
             width: 100%;
-            max-width: 600px;
+            max-width: 650px;
             padding: 30px;
             border-radius: 16px;
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
@@ -88,6 +103,22 @@ app.get('/', async (req, res) => {
             color: var(--accent-color);
             border-bottom: 2px solid rgba(0, 242, 254, 0.2);
             padding-bottom: 10px;
+          }
+          h2 {
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            padding-bottom: 5px;
+          }
+          .section-game {
+            color: var(--accent-color);
+            border-bottom: 1px dashed rgba(0, 242, 254, 0.3);
+          }
+          .section-updater {
+            color: var(--accent-updater);
+            border-bottom: 1px dashed rgba(255, 60, 70, 0.3);
           }
           .status {
             display: flex;
@@ -106,6 +137,13 @@ app.get('/', async (req, res) => {
           }
           .form-group {
             margin-bottom: 20px;
+          }
+          .row-flex {
+            display: flex;
+            gap: 15px;
+          }
+          .row-flex .form-group {
+            flex: 1;
           }
           label {
             display: block;
@@ -130,6 +168,9 @@ app.get('/', async (req, res) => {
             outline: none;
             border-color: var(--accent-color);
           }
+          .updater-group input[type="text"]:focus {
+            border-color: var(--accent-updater);
+          }
           button {
             width: 100%;
             padding: 14px;
@@ -140,14 +181,12 @@ app.get('/', async (req, res) => {
             font-weight: bold;
             font-size: 16px;
             cursor: pointer;
+            margin-top: 15px;
             transition: transform 0.2s, opacity 0.2s;
           }
           button:hover {
             opacity: 0.9;
             transform: translateY(-1px);
-          }
-          button:active {
-            transform: translateY(1px);
           }
           footer {
             margin-top: 25px;
@@ -166,8 +205,12 @@ app.get('/', async (req, res) => {
           </div>
           
           <form action="/update-config" method="POST">
+            
+            <!-- SECCIÓN JUEGO -->
+            <h2 class="section-game">Configuración del Juego Principal</h2>
+            
             <div class="form-group">
-              <label for="version">Versión Global Activa</label>
+              <label for="version">Versión Activa del Juego</label>
               <input type="text" id="version" name="version" value="${config.version || '2.3'}" required>
             </div>
             
@@ -179,6 +222,19 @@ app.get('/', async (req, res) => {
             <div class="form-group">
               <label for="url_data_win">URL de Descarga: data.win (Archivo Pesado)</label>
               <input type="text" id="url_data_win" name="url_data_win" value="${config.url_data_win || ''}" required>
+            </div>
+            
+            <!-- SECCIÓN ACTUALIZADOR -->
+            <h2 class="section-updater">Configuración del Auto-Updater (C#)</h2>
+            
+            <div class="form-group updater-group">
+              <label for="url_updater_version">Versión del Actualizador (Local v3.5)</label>
+              <input type="text" id="url_updater_version" name="url_updater_version" value="${config.url_updater_version || '3.5'}" required>
+            </div>
+            
+            <div class="form-group updater-group">
+              <label for="url_updater_exe">URL de Descarga: SteelAndPowderUpdater.exe</label>
+              <input type="text" id="url_updater_exe" name="url_updater_exe" value="${config.url_updater_exe || ''}" required>
             </div>
             
             <button type="submit">Guardar Cambios en Servidor</button>
@@ -194,21 +250,29 @@ app.get('/', async (req, res) => {
   }
 });
 
-// Ruta para procesar los cambios del formulario web
+// Procesar los cambios en lote de la base de datos
 app.post('/update-config', async (req, res) => {
-  const { version, url_exe, url_data_win } = req.body;
+  const { version, url_exe, url_data_win, url_updater_version, url_updater_exe } = req.body;
   try {
     await pool.query("UPDATE configuracion SET valor = $1 WHERE clave = 'version'", [version]);
     await pool.query("UPDATE configuracion SET valor = $1 WHERE clave = 'url_exe'", [url_exe]);
     await pool.query("UPDATE configuracion SET valor = $1 WHERE clave = 'url_data_win'", [url_data_win]);
-    res.send("<script>alert('¡Configuración guardada en PostgreSQL con éxito!'); window.location.href='/';</script>");
+    
+    // Guardar los nuevos del Updater
+    await pool.query("UPDATE configuracion SET valor = $1 WHERE clave = 'url_updater_version'", [url_updater_version]);
+    await pool.query("UPDATE configuracion SET valor = $1 WHERE clave = 'url_updater_exe'", [url_updater_exe]);
+    
+    res.send("<script>alert('¡Toda la configuración fue inyectada a la base de datos con éxito!'); window.location.href='/';</script>");
   } catch (err) {
     res.status(500).send("Error al actualizar la base de datos.");
   }
 });
 
-// --- APIS PARA EL JUEGO (.BAT) ---
+// ==========================================================
+//  ENDPOINTS DE CONSULTA (APIs para el Launcher / Updater)
+// ==========================================================
 
+// Consulta Versión del Juego
 app.get('/version', async (req, res) => {
   try {
     const resultado = await pool.query("SELECT valor FROM configuracion WHERE clave = 'version'");
@@ -218,15 +282,17 @@ app.get('/version', async (req, res) => {
   }
 });
 
-app.get('/download/data.win', async (req, res) => {
+// Consulta Versión del Updater ejecutable
+app.get('/updater/version', async (req, res) => {
   try {
-    const resultado = await pool.query("SELECT valor FROM configuracion WHERE clave = 'url_data_win'");
-    res.redirect(resultado.rows[0].valor);
+    const resultado = await pool.query("SELECT valor FROM configuracion WHERE clave = 'url_updater_version'");
+    res.send(resultado.rows[0].valor);
   } catch (err) {
     res.status(500).send("Error");
   }
 });
 
+// Redirección de Descarga: Juego (.exe)
 app.get('/download/SteelAndPowder.exe', async (req, res) => {
   try {
     const resultado = await pool.query("SELECT valor FROM configuracion WHERE clave = 'url_exe'");
@@ -236,6 +302,26 @@ app.get('/download/SteelAndPowder.exe', async (req, res) => {
   }
 });
 
+// Redirección de Descarga: Datos pesados (data.win)
+app.get('/download/data.win', async (req, res) => {
+  try {
+    const resultado = await pool.query("SELECT valor FROM configuracion WHERE clave = 'url_data_win'");
+    res.redirect(resultado.rows[0].valor);
+  } catch (err) {
+    res.status(500).send("Error");
+  }
+});
+
+// Redirección de Descarga: El nuevo binario del Auto-Updater (.exe)
+app.get('/download/SteelAndPowderUpdater.exe', async (req, res) => {
+  try {
+    const resultado = await pool.query("SELECT valor FROM configuracion WHERE clave = 'url_updater_exe'");
+    res.redirect(resultado.rows[0].valor);
+  } catch (err) {
+    res.status(500).send("Error");
+  }
+});
+
 app.listen(PORT, () => {
-  console.log(`Servidor activo en puerto ${PORT}`);
+  console.log(`Servidor de despliegue activo en puerto ${PORT}`);
 });
