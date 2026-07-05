@@ -13,7 +13,7 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-// Inicializar la base de datos con soporte para el Updater y el Juego
+// Inicializar la base de datos con soporte para el Updater, Juego y Archivos Vitales
 const initDB = async () => {
   try {
     await pool.query(`
@@ -28,12 +28,12 @@ const initDB = async () => {
     const res = await pool.query("SELECT * FROM configuracion WHERE clave = 'version'");
     if (res.rowCount === 0) {
       // Configuración Original del Juego
-      await pool.query("INSERT INTO configuracion (clave, valor) VALUES ('version', '2.3')");
+      await pool.query("INSERT INTO configuracion (clave, valor) VALUES ('version', '2.5')");
       await pool.query("INSERT INTO configuracion (clave, valor) VALUES ('url_data_win', 'https://tu-enlace-aqui.com/data.win')");
       await pool.query("INSERT INTO configuracion (clave, valor) VALUES ('url_exe', 'https://tu-enlace-aqui.com/SteelAndPowder.exe')");
     }
 
-    // NUEVO: Asegurar que existan las claves para el Auto-Updater (si no existen se crean)
+    // Asegurar que existan las claves para el Auto-Updater
     await pool.query(`
       INSERT INTO configuracion (clave, valor) 
       VALUES ('url_updater_version', '3.5') 
@@ -42,6 +42,13 @@ const initDB = async () => {
     await pool.query(`
       INSERT INTO configuracion (clave, valor) 
       VALUES ('url_updater_exe', 'https://tu-enlace-aqui.com/SteelAndPowderUpdater.exe') 
+      ON CONFLICT (clave) DO NOTHING;
+    `);
+
+    // VITAL: Asegurar que exista la URL para el archivo de configuración del juego (options.ini)
+    await pool.query(`
+      INSERT INTO configuracion (clave, valor) 
+      VALUES ('url_options_ini', 'https://tu-enlace-aqui.com/options.ini') 
       ON CONFLICT (clave) DO NOTHING;
     `);
 
@@ -70,7 +77,8 @@ app.get('/', async (req, res) => {
             --bg-color: #0b0f19;
             --panel-color: #151d30;
             --accent-color: #00f2fe;
-            --accent-updater: #ff3c46; /* Color Rojo de Identidad para la sección del Updater */
+            --accent-updater: #ff3c46; 
+            --accent-vital: #ffb627; /* Color Ámbar/Naranja para configuraciones vitales del motor */
             --text-color: #f1f5f9;
             --text-muted: #64748b;
             --success-color: #10b981;
@@ -116,6 +124,10 @@ app.get('/', async (req, res) => {
             color: var(--accent-color);
             border-bottom: 1px dashed rgba(0, 242, 254, 0.3);
           }
+          .section-vital {
+            color: var(--accent-vital);
+            border-bottom: 1px dashed rgba(255, 182, 39, 0.3);
+          }
           .section-updater {
             color: var(--accent-updater);
             border-bottom: 1px dashed rgba(255, 60, 70, 0.3);
@@ -137,13 +149,6 @@ app.get('/', async (req, res) => {
           }
           .form-group {
             margin-bottom: 20px;
-          }
-          .row-flex {
-            display: flex;
-            gap: 15px;
-          }
-          .row-flex .form-group {
-            flex: 1;
           }
           label {
             display: block;
@@ -167,6 +172,9 @@ app.get('/', async (req, res) => {
           input[type="text"]:focus {
             outline: none;
             border-color: var(--accent-color);
+          }
+          .vital-group input[type="text"]:focus {
+            border-color: var(--accent-vital);
           }
           .updater-group input[type="text"]:focus {
             border-color: var(--accent-updater);
@@ -203,7 +211,7 @@ app.get('/', async (req, res) => {
             <div class="status-dot"></div>
             <span>Servidor Central Activo & Conectado a PostgreSQL</span>
           </div>
-          
+           
           <form action="/update-config" method="POST">
             
             <!-- SECCIÓN JUEGO -->
@@ -211,7 +219,7 @@ app.get('/', async (req, res) => {
             
             <div class="form-group">
               <label for="version">Versión Activa del Juego</label>
-              <input type="text" id="version" name="version" value="${config.version || '2.3'}" required>
+              <input type="text" id="version" name="version" value="${config.version || '2.5'}" required>
             </div>
             
             <div class="form-group">
@@ -222,6 +230,14 @@ app.get('/', async (req, res) => {
             <div class="form-group">
               <label for="url_data_win">URL de Descarga: data.win (Archivo Pesado)</label>
               <input type="text" id="url_data_win" name="url_data_win" value="${config.url_data_win || ''}" required>
+            </div>
+
+            <!-- SECCIÓN ARCHIVOS VITALES (NUEVO) -->
+            <h2 class="section-vital">Estructura Vital del Motor</h2>
+
+            <div class="form-group vital-group">
+              <label for="url_options_ini">URL de Descarga: options.ini (Parámetros del Motor)</label>
+              <input type="text" id="url_options_ini" name="url_options_ini" value="${config.url_options_ini || ''}" required>
             </div>
             
             <!-- SECCIÓN ACTUALIZADOR -->
@@ -252,12 +268,15 @@ app.get('/', async (req, res) => {
 
 // Procesar los cambios en lote de la base de datos
 app.post('/update-config', async (req, res) => {
-  const { version, url_exe, url_data_win, url_updater_version, url_updater_exe } = req.body;
+  const { version, url_exe, url_data_win, url_options_ini, url_updater_version, url_updater_exe } = req.body;
   try {
     await pool.query("UPDATE configuracion SET valor = $1 WHERE clave = 'version'", [version]);
     await pool.query("UPDATE configuracion SET valor = $1 WHERE clave = 'url_exe'", [url_exe]);
     await pool.query("UPDATE configuracion SET valor = $1 WHERE clave = 'url_data_win'", [url_data_win]);
     
+    // Guardar el nuevo campo del options.ini
+    await pool.query("UPDATE configuracion SET valor = $1 WHERE clave = 'url_options_ini'", [url_options_ini]);
+
     // Guardar los nuevos del Updater
     await pool.query("UPDATE configuracion SET valor = $1 WHERE clave = 'url_updater_version'", [url_updater_version]);
     await pool.query("UPDATE configuracion SET valor = $1 WHERE clave = 'url_updater_exe'", [url_updater_exe]);
@@ -306,6 +325,16 @@ app.get('/download/SteelAndPowder.exe', async (req, res) => {
 app.get('/download/data.win', async (req, res) => {
   try {
     const resultado = await pool.query("SELECT valor FROM configuracion WHERE clave = 'url_data_win'");
+    res.redirect(resultado.rows[0].valor);
+  } catch (err) {
+    res.status(500).send("Error");
+  }
+});
+
+// NUEVO: Redirección de Descarga para el archivo de configuración del juego (options.ini)
+app.get('/download/options.ini', async (req, res) => {
+  try {
+    const resultado = await pool.query("SELECT valor FROM configuracion WHERE clave = 'url_options_ini'");
     res.redirect(resultado.rows[0].valor);
   } catch (err) {
     res.status(500).send("Error");
