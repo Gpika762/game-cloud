@@ -1,6 +1,6 @@
-Hola ! aqui los cambios que hemos hecho (v2.7)
-1. Se ha corregido un bug en el cual si hablas con un npc no te da la recompensa
-2. Se a corregido un error en el cual si salias de la tienda la musica de la sala no sonaba
-3. Se ha mejorado el tocadiscos
-yy eso es todo 
+Hola hola!!
+no hemos hecho tantos ccaambios hoy solo se an agregado 2 cosas (v3.0)
+1. Se a actualizado el intro del juego al iniciar una nueva partida
+2. Se ha actualizado el actualizador del juego
+eso es todo de momento yyy 
 Cualquer bug que suceda porfavor avisar al desarrollador 
