@@ -13,7 +13,7 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-// Inicializar la base de datos con soporte para el Updater, Juego y Archivos Vitales
+// Inicializar la base de datos con soporte para la nueva estructura unificada del ZIP
 const initDB = async () => {
   try {
     await pool.query(`
@@ -24,19 +24,23 @@ const initDB = async () => {
       );
     `);
     
-    // Verificar si ya está la estructura base
+    // Verificar e insertar versión base del juego
     const res = await pool.query("SELECT * FROM configuracion WHERE clave = 'version'");
     if (res.rowCount === 0) {
-      // Configuración Original del Juego
-      await pool.query("INSERT INTO configuracion (clave, valor) VALUES ('version', '2.5')");
-      await pool.query("INSERT INTO configuracion (clave, valor) VALUES ('url_data_win', 'https://tu-enlace-aqui.com/data.win')");
-      await pool.query("INSERT INTO configuracion (clave, valor) VALUES ('url_exe', 'https://tu-enlace-aqui.com/SteelAndPowder.exe')");
+      await pool.query("INSERT INTO configuracion (clave, valor) VALUES ('version', '4.0')");
     }
 
-    // Asegurar que existan las claves para el Auto-Updater
+    // 🌟 NUEVO: Asegurar que exista la clave para el archivo ZIP unificado
     await pool.query(`
       INSERT INTO configuracion (clave, valor) 
-      VALUES ('url_updater_version', '3.5') 
+      VALUES ('url_juego_zip', 'https://tu-enlace-aqui.com/juego.zip') 
+      ON CONFLICT (clave) DO NOTHING;
+    `);
+
+    // Asegurar que existan las claves para el Auto-Updater (C#)
+    await pool.query(`
+      INSERT INTO configuracion (clave, valor) 
+      VALUES ('url_updater_version', '4.0') 
       ON CONFLICT (clave) DO NOTHING;
     `);
     await pool.query(`
@@ -45,20 +49,16 @@ const initDB = async () => {
       ON CONFLICT (clave) DO NOTHING;
     `);
 
-    // VITAL: Asegurar que exista la URL para el archivo de configuración del juego (options.ini)
-    await pool.query(`
-      INSERT INTO configuracion (clave, valor) 
-      VALUES ('url_options_ini', 'https://tu-enlace-aqui.com/options.ini') 
-      ON CONFLICT (clave) DO NOTHING;
-    `);
+    // Opcional: Limpiar las claves antiguas obsoletas para que no dejen basura en tu DB
+    await pool.query("DELETE FROM configuracion WHERE clave IN ('url_exe', 'url_data_win', 'url_options_ini')");
 
   } catch (err) {
-    console.error("Error al inicializar la base de datos estratégica:", err);
+    console.error("Error al inicializar la base de datos unificada:", err);
   }
 };
 initDB();
 
-// --- INTERFAZ GRÁFICA CONTROL DE MANDOS (Dashboard) ---
+// --- INTERFAZ GRÁFICA CONTROL DE MANDOS (Dashboard Simplificado) ---
 app.get('/', async (req, res) => {
   try {
     const datos = await pool.query("SELECT * FROM configuracion");
@@ -78,7 +78,7 @@ app.get('/', async (req, res) => {
             --panel-color: #151d30;
             --accent-color: #00f2fe;
             --accent-updater: #ff3c46; 
-            --accent-vital: #ffb627; /* Color Ámbar/Naranja para configuraciones vitales del motor */
+            --accent-pack: #10b981; 
             --text-color: #f1f5f9;
             --text-muted: #64748b;
             --success-color: #10b981;
@@ -124,9 +124,9 @@ app.get('/', async (req, res) => {
             color: var(--accent-color);
             border-bottom: 1px dashed rgba(0, 242, 254, 0.3);
           }
-          .section-vital {
-            color: var(--accent-vital);
-            border-bottom: 1px dashed rgba(255, 182, 39, 0.3);
+          .section-pack {
+            color: var(--accent-pack);
+            border-bottom: 1px dashed rgba(16, 185, 129, 0.3);
           }
           .section-updater {
             color: var(--accent-updater);
@@ -173,8 +173,8 @@ app.get('/', async (req, res) => {
             outline: none;
             border-color: var(--accent-color);
           }
-          .vital-group input[type="text"]:focus {
-            border-color: var(--accent-vital);
+          .pack-group input[type="text"]:focus {
+            border-color: var(--accent-pack);
           }
           .updater-group input[type="text"]:focus {
             border-color: var(--accent-updater);
@@ -211,41 +211,28 @@ app.get('/', async (req, res) => {
             <div class="status-dot"></div>
             <span>Servidor Central Activo & Conectado a PostgreSQL</span>
           </div>
-           
+            
           <form action="/update-config" method="POST">
             
-            <!-- SECCIÓN JUEGO -->
             <h2 class="section-game">Configuración del Juego Principal</h2>
             
             <div class="form-group">
               <label for="version">Versión Activa del Juego</label>
-              <input type="text" id="version" name="version" value="${config.version || '2.5'}" required>
+              <input type="text" id="version" name="version" value="${config.version || '4.0'}" required>
             </div>
             
-            <div class="form-group">
-              <label for="url_exe">URL de Descarga: SteelAndPowder.exe</label>
-              <input type="text" id="url_exe" name="url_exe" value="${config.url_exe || ''}" required>
-            </div>
-            
-            <div class="form-group">
-              <label for="url_data_win">URL de Descarga: data.win (Archivo Pesado)</label>
-              <input type="text" id="url_data_win" name="url_data_win" value="${config.url_data_win || ''}" required>
-            </div>
+            <h2 class="section-pack">Distribución del Despliegue Unificado</h2>
 
-            <!-- SECCIÓN ARCHIVOS VITALES (NUEVO) -->
-            <h2 class="section-vital">Estructura Vital del Motor</h2>
-
-            <div class="form-group vital-group">
-              <label for="url_options_ini">URL de Descarga: options.ini (Parámetros del Motor)</label>
-              <input type="text" id="url_options_ini" name="url_options_ini" value="${config.url_options_ini || ''}" required>
+            <div class="form-group pack-group">
+              <label for="url_juego_zip">URL del Archivo Completo: juego.zip (Juego + Data + Config)</label>
+              <input type="text" id="url_juego_zip" name="url_juego_zip" value="${config.url_juego_zip || ''}" placeholder="Ej: https://link-directo-de-tu-zip.com/juego.zip" required>
             </div>
             
-            <!-- SECCIÓN ACTUALIZADOR -->
             <h2 class="section-updater">Configuración del Auto-Updater (C#)</h2>
             
             <div class="form-group updater-group">
-              <label for="url_updater_version">Versión del Actualizador (Local v3.5)</label>
-              <input type="text" id="url_updater_version" name="url_updater_version" value="${config.url_updater_version || '3.5'}" required>
+              <label for="url_updater_version">Versión del Actualizador (Local v4.0)</label>
+              <input type="text" id="url_updater_version" name="url_updater_version" value="${config.url_updater_version || '4.0'}" required>
             </div>
             
             <div class="form-group updater-group">
@@ -253,7 +240,7 @@ app.get('/', async (req, res) => {
               <input type="text" id="url_updater_exe" name="url_updater_exe" value="${config.url_updater_exe || ''}" required>
             </div>
             
-            <button type="submit">Guardar Cambios en Servidor</button>
+            <button type="submit">Inyectar Configuración en Caliente</button>
           </form>
           
           <footer>Diamant OS Core Engine // 2026</footer>
@@ -268,27 +255,21 @@ app.get('/', async (req, res) => {
 
 // Procesar los cambios en lote de la base de datos
 app.post('/update-config', async (req, res) => {
-  const { version, url_exe, url_data_win, url_options_ini, url_updater_version, url_updater_exe } = req.body;
+  const { version, url_juego_zip, url_updater_version, url_updater_exe } = req.body;
   try {
     await pool.query("UPDATE configuracion SET valor = $1 WHERE clave = 'version'", [version]);
-    await pool.query("UPDATE configuracion SET valor = $1 WHERE clave = 'url_exe'", [url_exe]);
-    await pool.query("UPDATE configuracion SET valor = $1 WHERE clave = 'url_data_win'", [url_data_win]);
-    
-    // Guardar el nuevo campo del options.ini
-    await pool.query("UPDATE configuracion SET valor = $1 WHERE clave = 'url_options_ini'", [url_options_ini]);
-
-    // Guardar los nuevos del Updater
+    await pool.query("UPDATE configuracion SET valor = $1 WHERE clave = 'url_juego_zip'", [url_juego_zip]);
     await pool.query("UPDATE configuracion SET valor = $1 WHERE clave = 'url_updater_version'", [url_updater_version]);
     await pool.query("UPDATE configuracion SET valor = $1 WHERE clave = 'url_updater_exe'", [url_updater_exe]);
     
-    res.send("<script>alert('¡Toda la configuración fue inyectada a la base de datos con éxito!'); window.location.href='/';</script>");
+    res.send("<script>alert('¡Estructura de distribución del ZIP actualizada con éxito en PostgreSQL!'); window.location.href='/';</script>");
   } catch (err) {
     res.status(500).send("Error al actualizar la base de datos.");
   }
 });
 
 // ==========================================================
-//  ENDPOINTS DE CONSULTA (APIs para el Launcher / Updater)
+//   ENDPOINTS DE CONSULTA (APIs para el Launcher / Updater)
 // ==========================================================
 
 // Consulta Versión del Juego
@@ -311,33 +292,14 @@ app.get('/updater/version', async (req, res) => {
   }
 });
 
-// Redirección de Descarga: Juego (.exe)
-app.get('/download/SteelAndPowder.exe', async (req, res) => {
+// 🌟 RUTA CRÍTICA: Redirección Dinámica del Paquete ZIP Completo del Juego
+app.get('/download/juego.zip', async (req, res) => {
   try {
-    const resultado = await pool.query("SELECT valor FROM configuracion WHERE clave = 'url_exe'");
+    const resultado = await pool.query("SELECT valor FROM configuracion WHERE clave = 'url_juego_zip'");
+    // Redirige directamente al link que guardaste en el Dashboard
     res.redirect(resultado.rows[0].valor);
   } catch (err) {
-    res.status(500).send("Error");
-  }
-});
-
-// Redirección de Descarga: Datos pesados (data.win)
-app.get('/download/data.win', async (req, res) => {
-  try {
-    const resultado = await pool.query("SELECT valor FROM configuracion WHERE clave = 'url_data_win'");
-    res.redirect(resultado.rows[0].valor);
-  } catch (err) {
-    res.status(500).send("Error");
-  }
-});
-
-// NUEVO: Redirección de Descarga para el archivo de configuración del juego (options.ini)
-app.get('/download/options.ini', async (req, res) => {
-  try {
-    const resultado = await pool.query("SELECT valor FROM configuracion WHERE clave = 'url_options_ini'");
-    res.redirect(resultado.rows[0].valor);
-  } catch (err) {
-    res.status(500).send("Error");
+    res.status(500).send("Error al procesar la descarga del paquete.");
   }
 });
 
