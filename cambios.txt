@@ -1,6 +1,12 @@
-Hola hola!!
-no hemos hecho tantos ccaambios hoy solo se an agregado 2 cosas (v3.0)
-1. Se a actualizado el intro del juego al iniciar una nueva partida
-2. Se ha actualizado el actualizador del juego
-eso es todo de momento yyy 
-Cualquer bug que suceda porfavor avisar al desarrollador 
+Hola hola hola
+como estan???
+Bueno hoy saldra la ultima update de esta demo (3.5) 
+los cambios son los siguente :
+1. Se ha mejorado la tienda se an añadido eventos de tiempo en el cual
+si es un  dia en especeifico o mes es especial se activara un descuento
+2. Se corrigio un bug de chica y de los zombie en el cual te expulsaban del mapa
+3. Se ha disminuido el puntaje necesario de suziesilla para activar un secreto
+4. Se ha mejorado el menu de inicio y haora pregunta si queres continuar con tu partida o no 
+yyy esos son todos los cambios se seguiran subiendo parches pero de momento esto es todo
+continuare con  el desarrollo del juego gracias por seguir jugando la demo!!!!
+fecha de esta update 10/7/2026
