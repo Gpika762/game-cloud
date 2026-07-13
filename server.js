@@ -45,7 +45,7 @@ const initDB = async () => {
       ON CONFLICT (clave) DO NOTHING;
     `);
 
-    // --- 🌟 NUEVO: PROTOCOLOS DE INSERCIÓN RAMA RETRO (32 BITS - IBM THINKCENTRE) ---
+    // --- PROTOCOLOS DE INSERCIÓN RAMA RETRO (32 BITS - IBM THINKCENTRE) ---
     const res32 = await pool.query("SELECT * FROM configuracion WHERE clave = 'version_32'");
     if (res32.rowCount === 0) {
       await pool.query("INSERT INTO configuracion (clave, valor) VALUES ('version_32', '1.0')");
@@ -95,7 +95,7 @@ app.get('/', async (req, res) => {
             --bg-color: #070a12;
             --panel-color: #0f1626;
             --accent-color: #00f2fe;
-            --accent-32: #eab308; /* Color Amarillo Táctico para la IBM ThinkCentre */
+            --accent-32: #eab308; 
             --accent-updater: #ff3c46; 
             --accent-pack: #10b981; 
             --text-color: #f1f5f9;
@@ -314,21 +314,22 @@ app.get('/', async (req, res) => {
   }
 });
 
-// Procesar los cambios globales en lote de ambas arquitecturas
+// 🔥 PROCESAR ACTUALIZACIÓN EN LOTE (CORREGIDO Y BLINDADO)
 app.post('/update-config', async (req, res) => {
   const { 
     version, url_juego_zip, url_updater_version, url_updater_exe,
     version_32, url_juego_zip_32, url_updater_version_32, url_updater_exe_32 
   } = req.body;
+
   try {
-    // Actualizar bloque de 64 bits
+    // --- Actualizar bloque de 64 bits ---
     await pool.query("UPDATE configuracion SET valor = $1 WHERE clave = 'version'", [version]);
     await pool.query("UPDATE configuracion SET valor = $1 WHERE clave = 'url_juego_zip'", [url_juego_zip]);
     await pool.query("UPDATE configuracion SET valor = $1 WHERE clave = 'url_updater_version'", [url_updater_version]);
-    await pool.query("UPDATE configuracion SET ... WHERE ...", [url_updater_exe]); // Sincronizado dinámicamente
+    // LINEA ERRÓNEA ELIMINADA TOTALMENTE AQUÍ (Se quitó el 'SET ... WHERE ...' que daba Error 500)
     await pool.query("UPDATE configuracion SET valor = $1 WHERE clave = 'url_updater_exe'", [url_updater_exe]);
     
-    // Actualizar bloque de 32 bits
+    // --- Actualizar bloque de 32 bits ---
     await pool.query("UPDATE configuracion SET valor = $1 WHERE clave = 'version_32'", [version_32]);
     await pool.query("UPDATE configuracion SET valor = $1 WHERE clave = 'url_juego_zip_32'", [url_juego_zip_32]);
     await pool.query("UPDATE configuracion SET valor = $1 WHERE clave = 'url_updater_version_32'", [url_updater_version_32]);
@@ -336,7 +337,9 @@ app.post('/update-config', async (req, res) => {
     
     res.send("<script>alert('¡Ambos ecosistemas (64 y 32 bits) actualizados en PostgreSQL!'); window.location.href='/';</script>");
   } catch (err) {
-    res.status(500).send("Error al inyectar configuraciones en PostgreSQL.");
+    // Te va a escupir el mensaje exacto en la respuesta si algo en Postgres vuelve a fallar
+    console.error("❌ ERROR AL INYECTAR EN POSTGRESQL:", err);
+    res.status(500).send(`<h3>Error interno al inyectar configuraciones en PostgreSQL</h3><p>Detalle técnico: ${err.message}</p>`);
   }
 });
 
@@ -373,10 +376,8 @@ app.get('/download/SteelAndPowderUpdater.exe', async (req, res) => {
 
 
 // ==========================================================
-// 🌟 NUEVO: ENDPOINTS DE CONSULTA RAMA RETRO (32-BITS XP)
+// 🌟 ENDPOINTS DE CONSULTA RAMA RETRO (32-BITS XP)
 // ==========================================================
-
-// Consulta de versión para el juego de GameMaker 1.4 (o su updater) en XP
 app.get('/32/version', async (req, res) => {
   try {
     const resultado = await pool.query("SELECT valor FROM configuracion WHERE clave = 'version_32'");
@@ -384,7 +385,6 @@ app.get('/32/version', async (req, res) => {
   } catch (err) { res.status(500).send("Error"); }
 });
 
-// Consulta de versión del Kernel del actualizador de 32 bits
 app.get('/32/updater/version', async (req, res) => {
   try {
     const resultado = await pool.query("SELECT valor FROM configuracion WHERE clave = 'url_updater_version_32'");
@@ -392,7 +392,6 @@ app.get('/32/updater/version', async (req, res) => {
   } catch (err) { res.status(500).send("Error"); }
 });
 
-// Redirección del ZIP unificado de 32 bits (Contiene: Steel_&_powder.exe, data.win, D3DX9_43.dll)
 app.get('/32/download/juego.zip', async (req, res) => {
   try {
     const resultado = await pool.query("SELECT valor FROM configuracion WHERE clave = 'url_juego_zip_32'");
@@ -400,7 +399,6 @@ app.get('/32/download/juego.zip', async (req, res) => {
   } catch (err) { res.status(500).send("Error"); }
 });
 
-// Redirección del ejecutable del auto-updater compilado para 32-bits / XP
 app.get('/32/download/SteelAndPowderUpdater.exe', async (req, res) => {
   try {
     const resultado = await pool.query("SELECT valor FROM configuracion WHERE clave = 'url_updater_exe_32'");
